@@ -52,6 +52,24 @@ public:
 protected:
 	std::default_random_engine engine;
 };
+//modified
+class tile_bag : public random_agent {
+	//bag contain 1, 2, 3
+	public:
+		tile_bag() : siz(0), bag({1, 2, 3}) {}
+		int get_tile(){
+			if (siz == 0) {
+				//refilled bag
+				std::shuffle(bag.begin(), bag.end(), engine);
+				siz = 3;
+			}
+			siz--;
+			return bag[siz];
+		}
+	private:
+		std::array<int, 3> bag;
+		int siz;
+};
 
 /**
  * random environment
@@ -65,13 +83,41 @@ public:
 		space({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 }), popup(0, 9) {}
 
 	virtual action take_action(const board& after) {
-		std::shuffle(space.begin(), space.end(), engine);
-		for (int pos : space) {
-			if (after(pos) != 0) continue;
-			board::cell tile = popup(engine) ? 1 : 2;
+		std::array<int, 4> arr = {0, 1, 2, 3};
+		int dir = after.get_dir();
+
+		switch (dir) {
+			case 0: //slide up by player
+				arr = {12, 13, 14, 15};
+				break;
+			case 1: //slide right by player
+				arr = {0, 4, 8, 12};
+				break;
+			case 2: //slide down by player
+				arr = {0, 1, 2, 3};
+				break;
+			case 3:
+				arr = {3, 7, 11, 15};
+				break;
+		}
+		std::shuffle(arr.begin(), arr.end(), engine);
+		tile_bag bag;
+		for (auto pos : arr) {
+			if(after(pos) != 0) continue;
+			int tile = bag.get_tile();
 			return action::place(pos, tile);
 		}
 		return action();
+
+
+		// std::shuffle(space.begin(), space.end(), engine);
+		// for (int pos : space) {
+		// 	if (after(pos) != 0) continue;
+		// 	board::cell tile = popup(engine) ? 1 : 2;
+		// 	return action::place(pos, tile);
+		// }
+		// return action();
+		
 	}
 
 private:

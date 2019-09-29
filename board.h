@@ -22,8 +22,8 @@ public:
 	typedef int reward;
 
 public:
-	board() : tile(), attr(0) {}
-	board(const grid& b, data v = 0) : tile(b), attr(v) {}
+	board() : tile(), attr(0), prev_dir(-1) {}
+	board(const grid& b, data v = 0) : tile(b), attr(v), prev_dir(-1) {}
 	board(const board& b) = default;
 	board& operator =(const board& b) = default;
 
@@ -36,7 +36,8 @@ public:
 
 	data info() const { return attr; }
 	data info(data dat) { data old = attr; attr = dat; return old; }
-
+	//modified
+	int get_dir() const {return prev_dir;}
 public:
 	bool operator ==(const board& b) const { return tile == b.tile; }
 	bool operator < (const board& b) const { return tile <  b.tile; }
@@ -62,7 +63,11 @@ public:
 	 * apply an action to the board
 	 * return the reward of the action, or -1 if the action is illegal
 	 */
+	//modified
 	reward slide(unsigned opcode) {
+		
+		prev_dir = opcode&0b11;
+		
 		switch (opcode & 0b11) {
 		case 0: return slide_up();
 		case 1: return slide_right();
@@ -77,25 +82,59 @@ public:
 		reward score = 0;
 		for (int r = 0; r < 4; r++) {
 			auto& row = tile[r];
-			int top = 0, hold = 0;
+			// int top = 0, hold = 0;
+			int prev = 0;
 			for (int c = 0; c < 4; c++) {
 				int tile = row[c];
-				if (tile == 0) continue;
-				row[c] = 0;
-				if (hold) {
-					if (tile == hold) {
-						row[top++] = ++tile;
-						score += (1 << tile);
-						hold = 0;
-					} else {
-						row[top++] = hold;
-						hold = tile;
-					}
-				} else {
-					hold = tile;
+				
+				if(tile == 0) {
+					prev = 0;
 				}
+				else {
+					if(prev==0 && c!=0 ) {
+						prev = 0;
+						row[c-1] = tile;
+						row[c] = 0;
+					}
+					else if(prev == tile) {
+						if(prev==1 || prev==2) {
+							prev = tile;
+							continue;
+						}
+						row[c-1] = ++tile;
+						row[c] = 0;
+						score += (1 << tile);
+						prev = 0; 
+					}
+					else if( (prev + tile) == 3 && prev != 0) {
+						row[c-1] = 3;
+						row[c] = 0;
+						score += (1 << 3);
+						prev = 0;
+					}
+					else {
+						prev = tile;
+					}
+				}
+
+
+				// if (tile == 0) continue;
+				
+				// row[c] = 0;
+				// if (hold) {
+				// 	if (tile == hold) {
+				// 		row[top++] = ++tile;
+				// 		score += (1 << tile);
+				// 		hold = 0;
+				// 	} else {
+				// 		row[top++] = hold;
+				// 		hold = tile;
+				// 	}
+				// } else {
+				// 	hold = tile;
+				// }
 			}
-			if (hold) tile[r][top] = hold;
+			// if (hold) tile[r][top] = hold;
 		}
 		return (*this != prev) ? score : -1;
 	}
@@ -172,4 +211,5 @@ public:
 private:
 	grid tile;
 	data attr;
+	int prev_dir;
 };

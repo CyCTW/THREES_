@@ -35,9 +35,12 @@ public:
 		ep_score += reward;
 		return true;
 	}
+	//modified
 	agent& take_turns(agent& play, agent& evil) {
 		ep_time = millisec();
-		return (std::max(step() + 1, size_t(2)) % 2) ? play : evil;
+		// std::cout << "step: " << step() << '\n';
+		return ( (step()+1) % 2) ? play : evil ;
+		// return (std::max(step() + 1, size_t(2)) % 2) ? play : evil;
 	}
 	agent& last_turns(agent& play, agent& evil) {
 		return take_turns(evil, play);
@@ -156,10 +159,24 @@ protected:
 			return std::getline(in, m.tag, '@') >> std::dec >> m.when;
 		}
 	};
-
+	//modified
 	static board initial_state() {
-		return {};
+		std::array<int, 16> num;
+		for (int i=0; i < num.size(); i++) 
+			num[i] = i;
+		std::default_random_engine eng;
+		std::shuffle(num.begin(), num.end(), eng);
+		board init;
+		tile_bag bag;
+		const int init_tile = 9;
+		for(unsigned int i=0; i < init_tile; i++) {
+			int idx = num[i];
+			int tile = bag.get_tile();
+			init(idx) = tile;
+		}
+		return init;
 	}
+
 	static time_t millisec() {
 		auto now = std::chrono::system_clock::now().time_since_epoch();
 		return std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
@@ -173,4 +190,5 @@ private:
 
 	meta ep_open;
 	meta ep_close;
+
 };

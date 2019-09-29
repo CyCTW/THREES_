@@ -64,17 +64,29 @@ int main(int argc, const char* argv[]) {
 
 		stat.open_episode(play.name() + ":" + evil.name());
 		episode& game = stat.back();
+		// int prev_dir = -1;
+		int cnt = 0;
 		while (true) {
 			agent& who = game.take_turns(play, evil);
 			action move = who.take_action(game.state());
+			
+			// for(int i=0; i<16; i++) {
+			// 	std::cout << ((i%4)? ' ': '\n') ;
+			// 	std::cout << game.state()(i);
+			// }
+			// std::cout << '\n';
+			// if(cnt++ > 3) break;
+			
 			if (game.apply_action(move) != true) break;
 			if (who.check_for_win(game.state())) break;
 		}
+		if(cnt) break;
 		agent& win = game.last_turns(play, evil);
 		stat.close_episode(win.name());
 
 		play.close_episode(win.name());
 		evil.close_episode(win.name());
+
 	}
 
 	if (summary) {
