@@ -21,7 +21,7 @@ public:
 	virtual ~agent() {}
 	virtual void open_episode(const std::string& flag = "") {}
 	virtual void close_episode(const std::string& flag = "") {}
-	virtual action take_action(const board& b) { return action(); }
+	virtual action take_action(const board& b, tile_bag & bg) { return action(); }
 	virtual bool check_for_win(const board& b) { return false; }
 
 public:
@@ -53,23 +53,23 @@ protected:
 	std::default_random_engine engine;
 };
 //modified
-class tile_bag : public random_agent {
-	//bag contain 1, 2, 3
-	public:
-		tile_bag() : siz(0), bag({1, 2, 3}) {}
-		int get_tile(){
-			if (siz == 0) {
-				//refilled bag
-				std::shuffle(bag.begin(), bag.end(), engine);
-				siz = 3;
-			}
-			siz--;
-			return bag[siz];
-		}
-	private:
-		std::array<int, 3> bag;
-		int siz;
-};
+// class tile_bag : public random_agent {
+// 	//bag contain 1, 2, 3
+// 	public:
+// 		tile_bag() : siz(0), bag({1, 2, 3}) {}
+// 		int get_tile(){
+// 			if (siz == 0) {
+// 				//refilled bag
+// 				std::shuffle(bag.begin(), bag.end(), engine);
+// 				siz = 3;
+// 			}
+// 			siz--;
+// 			return bag[siz];
+// 		}
+// 	private:
+// 		std::array<int, 3> bag;
+// 		int siz;
+// };
 
 /**
  * random environment
@@ -82,10 +82,23 @@ public:
 	rndenv(const std::string& args = "") : random_agent("name=random role=environment " + args),
 		space({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 }), popup(0, 9) {}
 
-	virtual action take_action(const board& after) {
+	virtual action take_action(const board& after, tile_bag &bg) {
+		// std::cout << "I am rndenv " << '\n';
 		std::array<int, 4> arr = {0, 1, 2, 3};
+		std::array<int, 16> arr_init = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 		int dir = after.get_dir();
+		
+		// std::cout << "dir: " << dir << '\n';
+		
+		std::shuffle(arr_init.begin(), arr_init.end(), engine);
 
+		if(dir == -2) {
+			for (auto pos : arr_init) {
+				if(after(pos) != 0) continue;
+				int tile = bg.get_tile();
+				return action::place(pos, tile);
+			}
+		}
 		switch (dir) {
 			case 0: //slide up by player
 				arr = {12, 13, 14, 15};
@@ -96,15 +109,18 @@ public:
 			case 2: //slide down by player
 				arr = {0, 1, 2, 3};
 				break;
-			case 3:
+			case 3: //slide left by player
 				arr = {3, 7, 11, 15};
-				break;
+				break;				
 		}
 		std::shuffle(arr.begin(), arr.end(), engine);
-		tile_bag bag;
+		// tile_bag bag;
 		for (auto pos : arr) {
+			// std::cout << "?" << '\n';
 			if(after(pos) != 0) continue;
-			int tile = bag.get_tile();
+			// board tmp = after;
+			
+			int tile = bg.get_tile();
 			return action::place(pos, tile);
 		}
 		return action();
@@ -134,13 +150,22 @@ public:
 	player(const std::string& args = "") : random_agent("name=dummy role=player " + args),
 		opcode({ 0, 1, 2, 3 }) {}
 
-	virtual action take_action(const board& before) {
+	virtual action take_action(const board& before, tile_bag &bg) {
 		std::shuffle(opcode.begin(), opcode.end(), engine);
+		// std::cout << "I am player " << '\n';
+		
+		int maxx = -3;
+		int maxop;
 		for (int op : opcode) {
 			board::reward reward = board(before).slide(op);
-			if (reward != -1) return action::slide(op);
+			if (reward > maxx) {
+				maxx = reward;
+				maxop = op;
+			}
+			// if (reward != -1) return action::slide(op);
 		}
-		return action();
+		return action::slide(maxop);
+		// return action();
 	}
 
 private:

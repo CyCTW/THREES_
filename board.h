@@ -2,6 +2,8 @@
 #include <array>
 #include <iostream>
 #include <iomanip>
+#include <algorithm>
+#include <random>
 
 /**
  * array-based board for 2048
@@ -13,6 +15,25 @@
  * (12) (13) (14) (15)
  *
  */
+class tile_bag {
+	//bag contain 1, 2, 3
+	public:
+		tile_bag() : siz(0), bag({1, 2, 3}) {}
+		int get_tile() {
+			if (siz == 0) {
+				//refilled bag
+				std::shuffle(bag.begin(), bag.end(), engine);
+				siz = 3;
+			}
+			siz--;
+			return bag[siz];
+		}
+	private:
+		std::array<int, 3> bag;
+		std::default_random_engine engine;
+		int siz;
+};
+
 class board {
 public:
 	typedef uint32_t cell;
@@ -22,8 +43,8 @@ public:
 	typedef int reward;
 
 public:
-	board() : tile(), attr(0), prev_dir(-1) {}
-	board(const grid& b, data v = 0) : tile(b), attr(v), prev_dir(-1) {}
+	board() : tile(), attr(0), prev_dir(-2) {}
+	board(const grid& b, data v = 0) : tile(b), attr(v), prev_dir(-2) {}
 	board(const board& b) = default;
 	board& operator =(const board& b) = default;
 
@@ -38,6 +59,7 @@ public:
 	data info(data dat) { data old = attr; attr = dat; return old; }
 	//modified
 	int get_dir() const {return prev_dir;}
+	int get_tile()  {return bag.get_tile();}
 public:
 	bool operator ==(const board& b) const { return tile == b.tile; }
 	bool operator < (const board& b) const { return tile <  b.tile; }
@@ -54,7 +76,7 @@ public:
 	 */
 	reward place(unsigned pos, cell tile) {
 		if (pos >= 16) return -1;
-		if (tile != 1 && tile != 2) return -1;
+		if (tile != 1 && tile != 2 && tile != 3) return -1;
 		operator()(pos) = tile;
 		return 0;
 	}
@@ -67,7 +89,6 @@ public:
 	reward slide(unsigned opcode) {
 		
 		prev_dir = opcode&0b11;
-		
 		switch (opcode & 0b11) {
 		case 0: return slide_up();
 		case 1: return slide_right();
@@ -212,4 +233,6 @@ private:
 	grid tile;
 	data attr;
 	int prev_dir;
+	tile_bag bag;
 };
+

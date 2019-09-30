@@ -57,7 +57,6 @@ int main(int argc, const char* argv[]) {
 
 	player play(play_args);
 	rndenv evil(evil_args);
-
 	while (!stat.is_finished()) {
 		play.open_episode("~:" + evil.name());
 		evil.open_episode(play.name() + ":~");
@@ -66,21 +65,25 @@ int main(int argc, const char* argv[]) {
 		episode& game = stat.back();
 		// int prev_dir = -1;
 		int cnt = 0;
+		tile_bag bg;
 		while (true) {
+
 			agent& who = game.take_turns(play, evil);
-			action move = who.take_action(game.state());
+			
+			action move = who.take_action(game.state(), bg);
+			
+			if (game.apply_action(move) != true) break;
+			if (who.check_for_win(game.state())) break;
 			
 			// for(int i=0; i<16; i++) {
 			// 	std::cout << ((i%4)? ' ': '\n') ;
 			// 	std::cout << game.state()(i);
 			// }
 			// std::cout << '\n';
-			// if(cnt++ > 3) break;
-			
-			if (game.apply_action(move) != true) break;
-			if (who.check_for_win(game.state())) break;
+			// std::cout << "cnt :" << cnt << '\n';
+			// if(cnt++ > 12) break;
 		}
-		if(cnt) break;
+		// if(cnt) break;
 		agent& win = game.last_turns(play, evil);
 		stat.close_episode(win.name());
 

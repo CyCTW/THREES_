@@ -15,7 +15,7 @@ class statistic;
 class episode {
 friend class statistic;
 public:
-	episode() : ep_state(initial_state()), ep_score(0), ep_time(0) { ep_moves.reserve(10000); }
+	episode() : ep_state(), ep_score(0), ep_time(0) { ep_moves.reserve(10000); }
 
 public:
 	board& state() { return ep_state; }
@@ -39,8 +39,8 @@ public:
 	agent& take_turns(agent& play, agent& evil) {
 		ep_time = millisec();
 		// std::cout << "step: " << step() << '\n';
-		return ( (step()+1) % 2) ? play : evil ;
-		// return (std::max(step() + 1, size_t(2)) % 2) ? play : evil;
+		// return ( (step()+1) % 2) ? play : evil ;
+		return (std::max(step()+1, size_t(9)) % 2) ? evil : play;
 	}
 	agent& last_turns(agent& play, agent& evil) {
 		return take_turns(evil, play);
@@ -161,20 +161,20 @@ protected:
 	};
 	//modified
 	static board initial_state() {
-		std::array<int, 16> num;
-		for (int i=0; i < num.size(); i++) 
-			num[i] = i;
-		std::default_random_engine eng;
-		std::shuffle(num.begin(), num.end(), eng);
-		board init;
-		tile_bag bag;
-		const int init_tile = 9;
-		for(unsigned int i=0; i < init_tile; i++) {
-			int idx = num[i];
-			int tile = bag.get_tile();
-			init(idx) = tile;
-		}
-		return init;
+		// std::array<int, 16> num;
+		// for (int i=0; i < num.size(); i++) 
+		// 	num[i] = i;
+		// std::default_random_engine eng;
+		// std::shuffle(num.begin(), num.end(), eng);
+		// board init;
+		// tile_bag bag;
+		// const int init_tile = 9;
+		// for(unsigned int i=0; i < init_tile; i++) {
+		// 	int idx = num[i];
+		// 	int tile = bag.get_tile();
+		// 	init(idx) = tile;
+		// }
+		// return init;
 	}
 
 	static time_t millisec() {
