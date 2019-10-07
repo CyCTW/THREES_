@@ -161,20 +161,7 @@ protected:
 	};
 	//modified
 	static board initial_state() {
-		// std::array<int, 16> num;
-		// for (int i=0; i < num.size(); i++) 
-		// 	num[i] = i;
-		// std::default_random_engine eng;
-		// std::shuffle(num.begin(), num.end(), eng);
-		// board init;
-		// tile_bag bag;
-		// const int init_tile = 9;
-		// for(unsigned int i=0; i < init_tile; i++) {
-		// 	int idx = num[i];
-		// 	int tile = bag.get_tile();
-		// 	init(idx) = tile;
-		// }
-		// return init;
+		return {};
 	}
 
 	static time_t millisec() {

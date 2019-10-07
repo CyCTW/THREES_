@@ -18,7 +18,7 @@
 class tile_bag {
 	//bag contain 1, 2, 3
 	public:
-		tile_bag() : siz(0), bag({1, 2, 3}) {}
+		tile_bag() : bag({1, 2, 3}), siz(0) {}
 		int get_tile() {
 			if (siz == 0) {
 				//refilled bag

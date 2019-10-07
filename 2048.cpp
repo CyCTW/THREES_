@@ -64,7 +64,6 @@ int main(int argc, const char* argv[]) {
 		stat.open_episode(play.name() + ":" + evil.name());
 		episode& game = stat.back();
 		// int prev_dir = -1;
-		int cnt = 0;
 		tile_bag bg;
 		while (true) {
 
