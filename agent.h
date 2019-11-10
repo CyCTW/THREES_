@@ -5,8 +5,15 @@
 #include <map>
 #include <type_traits>
 #include <algorithm>
+#include <vector>
 #include "board.h"
 #include "action.h"
+#include "weight.h"
+static const int TUPLE_NUM = 4;
+static const int TUPLE_LENGTH = 6;
+static const int way = 8;
+static const int boardsize = 16;
+static const long long MAX_INDEX = 15 * 15 * 15 * 15 * 15 * 15;
 
 class agent {
 public:
@@ -52,25 +59,62 @@ public:
 protected:
 	std::default_random_engine engine;
 };
-//modified
-// class tile_bag : public random_agent {
-// 	//bag contain 1, 2, 3
-// 	public:
-// 		tile_bag() : siz(0), bag({1, 2, 3}) {}
-// 		int get_tile(){
-// 			if (siz == 0) {
-// 				//refilled bag
-// 				std::shuffle(bag.begin(), bag.end(), engine);
-// 				siz = 3;
-// 			}
-// 			siz--;
-// 			return bag[siz];
-// 		}
-// 	private:
-// 		std::array<int, 3> bag;
-// 		int siz;
-// };
 
+class weight_agent : public agent {
+public:
+	weight_agent(const std::string& args = "") : agent(args) {
+		if (meta.find("init") != meta.end()) // pass init=... to initialize the weight
+			init_weights(meta["init"]);
+		if (meta.find("load") != meta.end()) // pass load=... to load from a specific file
+			load_weights(meta["load"]);
+	}
+	virtual ~weight_agent() {
+		if (meta.find("save") != meta.end()) // pass save=... to save to a specific file
+			save_weights(meta["save"]);
+	}
+
+protected:
+	virtual void init_weights(const std::string& info) {
+		net.emplace_back(65536); // create an empty weight table with size 65536
+		net.emplace_back(65536); // create an empty weight table with size 65536
+		// now net.size() == 2; net[0].size() == 65536; net[1].size() == 65536
+	}
+	virtual void load_weights(const std::string& path) {
+		std::ifstream in(path, std::ios::in | std::ios::binary);
+		if (!in.is_open()) std::exit(-1);
+		uint32_t size;
+		in.read(reinterpret_cast<char*>(&size), sizeof(size));
+		net.resize(size);
+		for (weight& w : net) in >> w;
+		in.close();
+	}
+	virtual void save_weights(const std::string& path) {
+		std::ofstream out(path, std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!out.is_open()) std::exit(-1);
+		uint32_t size = net.size();
+		out.write(reinterpret_cast<char*>(&size), sizeof(size));
+		for (weight& w : net) out << w;
+		out.close();
+	}
+
+protected:
+	std::vector<weight> net;
+};
+
+/**
+ * base agent for agents with a learning rate
+ */
+class learning_agent : public agent {
+public:
+	learning_agent(const std::string& args = "") : agent(args), alpha(0.1f) {
+		if (meta.find("alpha") != meta.end())
+			alpha = float(meta["alpha"]);
+	}
+	virtual ~learning_agent() {}
+
+protected:
+	float alpha;
+};
 /**
  * random environment
  * add a new random tile to an empty cell
@@ -87,8 +131,6 @@ public:
 		std::array<int, 4> arr = {0, 1, 2, 3};
 		std::array<int, 16> arr_init = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 		int dir = after.get_dir();
-		
-		// std::cout << "dir: " << dir << '\n';
 		
 		std::shuffle(arr_init.begin(), arr_init.end(), engine);
 
@@ -116,24 +158,13 @@ public:
 		std::shuffle(arr.begin(), arr.end(), engine);
 		// tile_bag bag;
 		for (auto pos : arr) {
-			// std::cout << "?" << '\n';
 			if(after(pos) != 0) continue;
-			// board tmp = after;
 			
 			int tile = bg.get_tile();
 			return action::place(pos, tile);
 		}
 		return action();
 
-
-		// std::shuffle(space.begin(), space.end(), engine);
-		// for (int pos : space) {
-		// 	if (after(pos) != 0) continue;
-		// 	board::cell tile = popup(engine) ? 1 : 2;
-		// 	return action::place(pos, tile);
-		// }
-		// return action();
-		
 	}
 
 private:
@@ -145,29 +176,171 @@ private:
  * dummy player
  * select a legal action randomly
  */
-class player : public random_agent {
+class player : public weight_agent {
 public:
-	player(const std::string& args = "") : random_agent("name=dummy role=player " + args),
-		opcode({ 0, 1, 2, 3 }) {}
+	player(const std::string& args = "") : weight_agent("name=dummy role=player " + args),
+		opcode({ 0, 1, 2, 3 }) {
+			for (int i=0; i<TUPLE_NUM; i++)
+				net.push_back(weight(MAX_INDEX));
+		}
 
 	virtual action take_action(const board& before, tile_bag &bg) {
 		//std::shuffle(opcode.begin(), opcode.end(), engine);
 		// std::cout << "I am player " << '\n';
 		
-		int maxx = -3;
-		int maxop = -1;
+		int best_op = -1;
+		float v_s = -999999;
+		board after;
+		int best_reward = 0;
+
 		for (int op : opcode) {
-			board::reward reward = board(before).slide(op);
-			if (reward > maxx) {
-				maxx = reward;
-				maxop = op;
+
+			board next = before;
+			board::reward reward = next.slide(op);
+
+			if (reward != -1) {
+				float v_s_tmp = load_value(next) + reward;
+				if(v_s_tmp > v_s) {
+					best_op = op;
+					v_s = v_s_tmp;
+					after = next;
+					best_reward = reward;
+				}
 			}
-			// if (reward != -1) return action::slide(op);
 		}
-		return action::slide(maxop);
-		// return action();
+		if(best_op == -1)
+			return action();
+		else{
+			episodes.push_back(state{after, best_reward});
+			return action::slide(best_op);
+		}
+	
 	}
+	virtual void open_episode(const std::string& flag = "" ) {
+		episodes.clear();
+		episodes.reserve(357600);
+	} 
 
 private:
 	std::array<int, 4> opcode;
+	struct state {
+		board after;
+		int reward;
+	};
+	std::vector<state> episodes;
+private:
+	long get_tuple_value(const board &b,const std::array<int, boardsize> arr) {
+		long result = 0;
+		int c = 15;
+		std::vector<int> pos(6, -1);
+		for (int i=0; i < boardsize; i++) {
+			if (arr[i] == 0) continue;
+			pos[ arr[i] - 1 ] = *(&(b[0][0]) + i);
+			// result *= c;
+			// result += *(&(b[0][0]) + i);
+		}
+
+		for(auto &a: pos ) {
+			
+			if(a == -1) continue;
+			result *= c;
+			// int tile = *(&(b[0][0]) + i);
+			result += a;
+			
+		}
+		return result;
+	}
+
+	void reflect_horizontal(std::array<int, 16> &arr) {
+		
+		for (int i = 0; i < 4 ; i++) {
+			std::swap(arr[ (i<<2)    ], arr[ (i<<2) + 3]);
+			std::swap(arr[ (i<<2) + 1], arr[ (i<<2) + 2]);
+		}
+	}
+	void transpose(std::array<int, 16> &arr) {
+		for (int i = 0; i < 4; i++) 
+			for (int j = i + 1; j < 4 ; j++) {
+				std::swap(arr[ (i<<2) + j], arr[ (j<<2) + i]);
+			}
+	}
+	void rotate(std::array<int, 16> &arr) {
+		transpose(arr); reflect_horizontal(arr);
+	}	
+	double load_value(const board &b) {
+		double total = 0;		
+		std::array<std::array<int, boardsize > ,TUPLE_NUM > arr = n_tuple;
+		
+		for (int i = 0; i < TUPLE_NUM; i++) {
+			for (int j = 0; j < 2 ; j++) {
+				reflect_horizontal(arr[i]);
+				for (int k = 0; k < 4; k++) {
+					total += net[i][ get_tuple_value(b, arr[i] )];
+					rotate(arr[i]);
+				}
+			}
+		}
+		return total;
+	}
+	void print(std::array<int, 16> &arr) {
+		for(int i=0; i<4; i++){
+			for(int j=0; j<4; j++)
+				std::cout << arr[ (i<<2)+j] << " ";
+			std::cout << '\n';
+		}
+		std::cout << '\n';
+	}
+	void train_weight(board &now , board &next , int reward, int firstin) {
+		std::array<std::array<int, boardsize> ,TUPLE_NUM> arr = n_tuple;
+		double rate = 0.003125f;
+		double data;
+		if(firstin) data = rate * (-load_value(now));
+		else data = rate * (reward + load_value(next) - load_value(now));
+
+		
+		for (int i = 0; i < TUPLE_NUM; i++) {
+			for (int j = 0; j < 2 ; j++) {
+				reflect_horizontal(arr[i]);
+				for (int k = 0; k < 4; k++) {
+					net[i][get_tuple_value(now, arr[i] )] += data;
+					rotate(arr[i]);
+				}
+			}
+		}
+
+	}
+private:
+	std::array<std::array<int, boardsize> ,TUPLE_NUM> n_tuple = {{
+		{{1, 6, 0, 0,
+		 2, 5, 0, 0,
+		 3, 4, 0, 0,
+		 0, 0, 0, 0}},
+
+		{{0, 1, 6, 0,
+		 0, 2, 5, 0,
+		 0, 3, 4, 0,
+		 0, 0, 0, 0}},
+		
+		{{0, 0, 1, 0,
+		 0, 0, 2, 0,
+		 0, 0, 3, 0,
+		 0, 0, 4, 0}},
+
+		{{0, 0, 0, 1,
+		 0, 0, 0, 2,
+		 0, 0, 0, 3,
+		 0, 0, 0, 4}}
+	}};
+public:
+	virtual void close_episode(const std::string& flag = "") {
+		
+		unsigned int siz = episodes.size();
+		train_weight(episodes[siz - 1].after, episodes[siz - 1].after, 0, 1);
+		for (int i = siz - 2 ; i >= 0; i--) {
+			state next = episodes[i+1];
+			train_weight(episodes[i].after , next.after , next.reward, 0);
+		}
+
+	}
+
 };
